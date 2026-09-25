@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — WEB TV JOAÇABA</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial,sans-serif}
+header{padding:18px 20px;background:#151515;border-bottom:1px solid #292929}
+h1{margin:0;font-size:22px}
+.sub{color:#aaa;margin-top:5px;font-size:14px}
+main{max-width:900px;margin:auto;padding:20px}
+.card{background:#151515;border:1px solid #292929;border-radius:14px;padding:18px;margin-bottom:18px}
+h2{font-size:18px;margin:0 0 15px}
+label{display:block;color:#bbb;font-size:13px;margin:12px 0 6px}
+input[type=text],input[type=url]{width:100%;padding:12px;border-radius:9px;border:1px solid #333;background:#0d0d0d;color:#fff}
+input[type=file]{width:100%;padding:10px;background:#0d0d0d;border-radius:9px;color:#bbb}
+button{border:0;border-radius:9px;padding:11px 14px;background:#e50914;color:#fff;font-weight:bold;cursor:pointer}
+button.secondary{background:#2b2b2b}
+button.danger{background:#8b0000}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.info{padding:12px;border-radius:9px;background:#101010;color:#bbb;font-size:13px;line-height:1.5}
+#count{float:right;background:#292929;padding:7px 11px;border-radius:20px;font-size:13px}
+.item{display:flex;align-items:center;gap:12px;background:#101010;border:1px solid #292929;border-radius:11px;padding:12px;margin-top:10px}
+.num{width:30px;height:30px;border-radius:50%;background:#292929;display:grid;place-items:center;font-weight:bold}
+.meta{flex:1;min-width:150px}
+.title{font-weight:bold}
+.url{font-size:11px;color:#777;word-break:break-all;margin-top:4px}
+.badge{font-size:11px;padding:5px 8px;border-radius:12px;background:#174d25;color:#8ff0a4}
+.badge.off{background:#4a2020;color:#ffaaaa}
+.actions{display:flex;gap:5px;flex-wrap:wrap}
+.actions button{padding:8px 10px;font-size:12px}
+.empty{text-align:center;color:#777;padding:25px}
+.notice{color:#ffcf70;font-size:13px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <h1>WEB TV JOAÇABA — Administração</h1>
+  <div class="sub">Gerenciamento da playlist • máximo 10 vídeos • máximo 3 minutos</div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Adicionar vídeo</h2>
+
+    <label>Título do vídeo</label>
+    <input id="title" type="text" placeholder="Ex.: Comercial Empresa X">
+
+    <label>Arquivo de vídeo — teste local</label>
+    <input id="file" type="file" accept="video/*">
+
+    <label>Ou URL do vídeo</label>
+    <input id="url" type="url" placeholder="https://exemplo.com/video.mp4">
+
+    <div class="row" style="margin-top:14px">
+      <button onclick="addVideo()">Adicionar à playlist</button>
+    </div>
+
+    <div class="info" style="margin-top:14px">
+      <b>Regra:</b> o sistema aceita até 10 vídeos. Cada vídeo precisa ter duração de no máximo 3 minutos.
+      <br><br>
+      <span class="notice">Nesta primeira versão, os dados ficam apenas neste navegador. Na próxima etapa vamos conectar o painel ao armazenamento online (Cloudflare R2), para que o player público consiga acessar os vídeos.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Playlist <span id="count">0 / 10</span></h2>
+    <div id="list"></div>
+  </div>
+</main>
+
+<script>
+const KEY='webtv_joacaba_playlist_v1';
+let playlist=JSON.parse(localStorage.getItem(KEY)||'[]');
+
+function save(){
+  localStorage.setItem(KEY,JSON.stringify(playlist));
+  render();
+}
+
+function addVideo(){
+  if(playlist.length>=10){alert('Limite de 10 vídeos atingido.');return;}
+
+  const title=document.getElementById('title').value.trim()||'Vídeo sem título';
+  const url=document.getElementById('url').value.trim();
+  const file=document.getElementById('file').files[0];
+
+  if(!file && !url){
+    alert('Selecione um arquivo ou informe uma URL.');
+    return;
+  }
+
+  if(file){
+    const tempUrl=URL.createObjectURL(file);
+    const video=document.createElement('video');
+    video.preload='metadata';
+    video.onloadedmetadata=()=>{
+      URL.revokeObjectURL(video.src);
+      if(video.duration>180.01){
+        alert('Este vídeo tem mais de 3 minutos e não pode ser adicionado.');
+        return;
+      }
+      playlist.push({
+        id:Date.now(),
+        title,
+        url:tempUrl,
+        source:'arquivo local',
+        enabled:true
+      });
+      save();
+      clearForm();
+      alert('Vídeo adicionado em modo local.');
+    };
+    video.onerror=()=>alert('Não foi possível ler o vídeo.');
+    video.src=tempUrl;
+  }else{
+    playlist.push({
+      id:Date.now(),
+      title,
+      url,
+      source:'URL',
+      enabled:true
+    });
+    save();
+    clearForm();
+    alert('URL adicionada. A duração será validada pelo player quando carregada.');
+  }
+}
+
+function clearForm(){
+  document.getElementById('title').value='';
+  document.getElementById('url').value='';
+  document.getElementById('file').value='';
+}
+
+function move(i,dir){
+  const j=i+dir;
+  if(j<0||j>=playlist.length)return;
+  [playlist[i],playlist[j]]=[playlist[j],playlist[i]];
+  save();
+}
+
+function toggle(i){
+  playlist[i].enabled=!playlist[i].enabled;
+  save();
+}
+
+function removeVideo(i){
+  if(confirm('Excluir este vídeo da playlist?')){
+    playlist.splice(i,1);
+    save();
+  }
+}
+
+function render(){
+  document.getElementById('count').textContent=playlist.length+' / 10';
+  const list=document.getElementById('list');
+
+  if(!playlist.length){
+    list.innerHTML='<div class="empty">Nenhum vídeo cadastrado.</div>';
+    return;
+  }
+
+  list.innerHTML=playlist.map((v,i)=>`
+    <div class="item">
+      <div class="num">${i+1}</div>
+      <div class="meta">
+        <div class="title">${escapeHtml(v.title)}</div>
+        <div class="url">${escapeHtml(v.source||'')}</div>
+      </div>
+      <span class="badge ${v.enabled?'':'off'}">${v.enabled?'ATIVO':'INATIVO'}</span>
+      <div class="actions">
+        <button class="secondary" onclick="move(${i},-1)">↑</button>
+        <button class="secondary" onclick="move(${i},1)">↓</button>
+        <button class="secondary" onclick="toggle(${i})">${v.enabled?'Desativar':'Ativar'}</button>
+        <button class="danger" onclick="removeVideo(${i})">Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+
+render();
+</script>
+</body>
+</html>
