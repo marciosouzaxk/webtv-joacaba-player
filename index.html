@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web TV Joaçaba - Player</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#000;color:#fff;font-family:Arial,sans-serif}
+    .player{width:100%;max-width:1100px;margin:auto;background:#050505}
+    video{display:block;width:100%;aspect-ratio:16/9;background:#000}
+    .bar{padding:12px 15px;background:#111;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+    .status{font-size:14px;color:#bbb}
+    .badge{font-size:12px;padding:5px 9px;border-radius:20px;background:#222;color:#ddd}
+    .empty{padding:35px 20px;text-align:center;color:#aaa}
+  </style>
+</head>
+<body>
+  <div class="player">
+    <video id="video" controls playsinline preload="metadata"></video>
+    <div class="bar">
+      <div>
+        <strong>WEB TV JOAÇABA</strong>
+        <div id="status" class="status">Player aguardando vídeos</div>
+      </div>
+      <div id="counter" class="badge">0 / 10</div>
+    </div>
+    <div id="empty" class="empty">
+      A playlist ainda não foi configurada.
+    </div>
+  </div>
+
+  <script>
+    /*
+      VERSÃO INICIAL
+      -------------------------------------------------
+      Depois vamos substituir esta lista pelo sistema
+      administrativo. Cada item pode receber uma URL
+      pública de vídeo MP4.
+    */
+    const playlist = [
+      // Exemplo:
+      // { title: "Comercial 01", src: "https://seu-servidor.com/video1.mp4" },
+      // { title: "Comercial 02", src: "https://seu-servidor.com/video2.mp4" }
+    ];
+
+    const video = document.getElementById("video");
+    const status = document.getElementById("status");
+    const counter = document.getElementById("counter");
+    const empty = document.getElementById("empty");
+
+    let current = 0;
+
+    function loadVideo(index, autoplay = false) {
+      if (!playlist.length) {
+        counter.textContent = "0 / 10";
+        status.textContent = "Player aguardando vídeos";
+        empty.style.display = "block";
+        return;
+      }
+
+      current = (index + playlist.length) % playlist.length;
+      const item = playlist[current];
+
+      video.src = item.src;
+      status.textContent = item.title || ("Vídeo " + (current + 1));
+      counter.textContent = (current + 1) + " / " + playlist.length;
+      empty.style.display = "none";
+
+      if (autoplay) {
+        video.play().catch(() => {});
+      }
+    }
+
+    video.addEventListener("ended", () => {
+      loadVideo(current + 1, true);
+    });
+
+    video.addEventListener("error", () => {
+      status.textContent = "Erro ao carregar o vídeo.";
+    });
+
+    loadVideo(0, false);
+  </script>
+</body>
+</html>
